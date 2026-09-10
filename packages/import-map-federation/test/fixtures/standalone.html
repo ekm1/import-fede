@@ -1,0 +1,9 @@
+<!doctype html><meta charset=utf-8><title>MFE-B standalone</title>
+<script type="importmap">
+{ "imports": { "react": "/mfe-b/vendor/react-17.js" } }
+</script>
+<script type="module">
+import * as m from '/mfe-b/entry.js';
+window.__m = { seen: m.seen, owner: m.marker.owner, deep: m.deepSeen };
+window.__done = true;
+</script>
