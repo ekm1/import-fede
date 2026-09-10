@@ -108,12 +108,44 @@ Verified in headless Chromium 141 (`test/browser-verify.mjs`):
   Export names must be enumerated, bindings are a snapshot rather than live, and
   CSP needs `script-src blob:`.
 
+## Example
+
+```
+npm run example
+```
+
+Serves a host on :8099 and a CDN of MFEs on :8100 — two origins, as in a real
+deployment.
+
+| | | |
+|---|---|---|
+| host | `:8099/` | `@fed/ui@1.5.0`, `@fed/store@2.0.0` |
+| catalog MFE | `:8100/catalog/standalone.html` | needs `@fed/store@^2.0.0` — **compatible** |
+| legacy MFE | `:8100/legacy/standalone.html` | needs `@fed/store@^1.0.0` — **incompatible** |
+
+`@fed/store` v1 exposes `add()` and v2 exposes `increment()`, so handing legacy the
+host's v2 would genuinely throw — the fallback isn't decorative.
+
+On the host page, Host and Catalog print the same store instance id and their
+counters move together; Legacy has its own instance and counts alone. Both MFEs
+still share `@fed/ui` with the host, because **isolation is per dependency, not per
+MFE**. The page prints the resolution table and the generated map.
+
+Each MFE also runs standalone from the same build artifact, against a static
+import map emitted at build time — a lone MFE has nothing to negotiate, so that
+path needs no runtime at all.
+
 ## Tests
 
 ```
-node test/resolve.test.mjs      # resolver logic
-node test/browser-verify.mjs    # generated map, real browser, two origins
+npm test              # resolver logic
+npm run test:browser  # generated map, real browser, two origins
+node test/e2e.test.mjs   # full example: mount, share, isolate, standalone
 ```
+
+The e2e test asserts module *instance* identity, not just version strings: it
+clicks through the host and both MFEs and checks that shared state moves together
+where deduped and stays separate where isolated.
 
 `browser-verify` needs `playwright` and the two fixture origins on :8099/:8100.
 It asserts MFE-A shares the host's *instance* while MFE-B, its nested chunks

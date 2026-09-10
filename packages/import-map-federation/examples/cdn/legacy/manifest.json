@@ -1,0 +1,9 @@
+{
+  "name": "legacy",
+  "entry": "./entry.js",
+  "exposes": { "./App": "./entry.js" },
+  "shared": {
+    "@fed/ui":    { "requiredVersion": "^1.0.0", "version": "1.2.0", "url": "./vendor/ui-1.2.0.js" },
+    "@fed/store": { "requiredVersion": "^1.0.0", "version": "1.0.0", "url": "./vendor/store-1.0.0.js" }
+  }
+}

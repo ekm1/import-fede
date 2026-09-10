@@ -1,0 +1,69 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Import Map Federation — Host</title>
+<style>
+  :root { color-scheme: light dark; --bd:#d5d8dd; --mut:#666; --ok:#0a7c42; --iso:#b25000; }
+  @media (prefers-color-scheme: dark) { :root { --bd:#3a3f47; --mut:#9aa0a8; --ok:#4ade80; --iso:#fb923c; } }
+  body { font: 14px/1.55 system-ui, sans-serif; margin: 0; padding: 24px; max-width: 980px; }
+  h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 15px; margin: 28px 0 8px; }
+  .lede { color: var(--mut); margin: 0 0 20px; }
+  .card { border: 1px solid var(--bd); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .card h3 { margin: 0 0 2px; font-size: 14px; } .sub, .id { color: var(--mut); font-size: 12px; margin: 2px 0; }
+  .card p:last-of-type { margin-bottom: 10px; } .card button { margin-top: 2px; }
+  .id { font-family: ui-monospace, monospace; }
+  #mfes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .mfe { border: 1px dashed var(--bd); border-radius: 10px; padding: 12px; }
+  button { font: inherit; padding: 5px 11px; border: 1px solid var(--bd); border-radius: 6px;
+           background: transparent; color: inherit; cursor: pointer; }
+  button:hover { border-color: currentColor; }
+  strong { font-variant-numeric: tabular-nums; font-size: 16px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--bd); }
+  th { font-weight: 600; color: var(--mut); }
+  tr.ok td:nth-child(3), tr.ok td:last-child { color: var(--ok); }
+  tr.iso td:nth-child(3), tr.iso td:last-child { color: var(--iso); }
+  pre { background: color-mix(in srgb, currentColor 6%, transparent); padding: 12px;
+        border-radius: 8px; overflow-x: auto; font-size: 12px; }
+  .list { margin: 6px 0 0; padding-left: 18px; color: var(--mut); font-size: 12px; }
+  .err { color: #c0392b; }
+</style>
+
+<h1>Import Map Federation</h1>
+<p class="lede">
+  Catalog needs <code>@fed/store@^2.0.0</code> — compatible, so it shares the host's instance.
+  Legacy needs <code>@fed/store@^1.0.0</code> — incompatible, so it falls back to its own copy.
+  Both share <code>@fed/ui</code>. Click the buttons: Host and Catalog move together, Legacy counts alone.
+</p>
+
+<section id="host-panel"></section>
+<section id="mfes"></section>
+<section id="report"></section>
+
+<!-- Classic script: importing the bootstrap as a module would itself be the
+     first module load, which locks the import map in single-map browsers. -->
+<script src="/dist/import-map-federation.global.js"></script>
+<script>
+  (async () => {
+    const CDN = 'http://127.0.0.1:8100';
+    try {
+      const fed = await window.ImportMapFederation.bootstrap({
+        host: {
+          name: 'host',
+          shares: {
+            '@fed/ui':    { version: '1.5.0', url: '/vendor/ui-1.5.0.js' },
+            '@fed/store': { version: '2.0.0', url: '/vendor/store-2.0.0.js' },
+          },
+        },
+        manifests: [CDN + '/catalog/manifest.json', CDN + '/legacy/manifest.json'],
+      });
+      window.__fed = fed;
+      const app = await import('/app.js');   // only now, after the map exists
+      await app.start(fed);
+      window.__ready = true;
+    } catch (err) {
+      document.body.insertAdjacentHTML('beforeend',
+        '<p class="err">Bootstrap failed: ' + err.message + '</p>');
+      window.__ready = true; window.__bootError = String(err);
+    }
+  })();
+</script>

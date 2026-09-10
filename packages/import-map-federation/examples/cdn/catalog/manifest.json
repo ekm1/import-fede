@@ -1,0 +1,9 @@
+{
+  "name": "catalog",
+  "entry": "./entry.js",
+  "exposes": { "./App": "./entry.js" },
+  "shared": {
+    "@fed/ui":    { "requiredVersion": "^1.0.0", "version": "1.5.0", "url": "./vendor/ui-1.5.0.js" },
+    "@fed/store": { "requiredVersion": "^2.0.0", "version": "2.0.0", "url": "./vendor/store-2.0.0.js" }
+  }
+}
