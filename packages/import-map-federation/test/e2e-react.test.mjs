@@ -30,7 +30,7 @@ try {
   const id = (who, dep) => (who === 'host' ? v.host : v.mfes[who])?.[dep]?.instanceId;
   const ver = (who, dep) => (who === 'host' ? v.host : v.mfes[who])?.[dep]?.version;
 
-  console.log('\n-- singletons are genuinely single --');
+  console.log('\n-- singletons resolve to one instance --');
   check('react: host === dashboard', id('host', 'react') === id('dashboard', 'react'),
     `${id('host', 'react')} vs ${id('dashboard', 'react')}`);
   check('react: host === reports', id('host', 'react') === id('reports', 'react'));

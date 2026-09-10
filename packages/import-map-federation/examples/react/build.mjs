@@ -116,8 +116,8 @@ function hostHtml() {
 <p class="lede">
   Both MFEs render as React components <em>inside</em> the host's tree, so their hooks,
   <code>useSelector</code> and <code>useLocation</code> only work if React, react-redux and
-  react-router are literally the same instances the host loaded. Reports pins
-  <code>date-fns@^2</code> against the host's v4, so it gets its own copy of that one library.
+  react-router are the host's own instances. Reports pins <code>date-fns@^2</code> against
+  the host's v4, so it gets its own copy of that one library.
 </p>
 <div id="root"></div>
 <script src="/dist/import-map-federation.global.js"></script>

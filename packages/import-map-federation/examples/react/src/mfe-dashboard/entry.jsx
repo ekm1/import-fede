@@ -7,7 +7,7 @@ import { __vendor as vReact } from 'react';
 export const vendors = { react: vReact, 'react-redux': vReactRedux, 'date-fns': vDateFns };
 
 // Rendered inside the host's React tree: the hooks below reach the host's store
-// and router through context, which only works if React is genuinely shared.
+// and router through context, which only works if React is shared.
 export function App() {
   const items = useSelector((s) => s.cart.items);
   const dispatch = useDispatch();
