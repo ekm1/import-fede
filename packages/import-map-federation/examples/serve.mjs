@@ -1,4 +1,3 @@
-// Two origins, mirroring a real deployment: the host app, and a CDN serving MFEs.
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
@@ -38,7 +37,6 @@ const EXAMPLES = {
 export async function startServers({ hostPort = 8099, cdnPort = 8100, example = 'basic' } = {}) {
   const dirs = EXAMPLES[example];
   if (!dirs) throw new Error(`Unknown example "${example}". Try: ${Object.keys(EXAMPLES).join(', ')}`);
-  // /dist/ serves the bootstrap IIFE from the package, for both examples.
   const host = serve([['/dist/', join(PKG, 'dist')], ['/', dirs.host]]);
   const cdn = serve([['/', dirs.cdn]], { cors: true });
   await new Promise((r) => host.listen(hostPort, '127.0.0.1', r));

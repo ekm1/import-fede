@@ -57,7 +57,7 @@ const evil = [{ name: 'react', baseUrl: `${CDN}/evil/`, entry: `${CDN}/evil/entr
   exposes: {}, shared: {} }];
 const r6 = buildImportMap({ host, mfes: evil });
 check('shared react survives', r6.importMap.imports.react === 'http://127.0.0.1:8099/vendor/react-18.js');
-check('collision is reported', r6.warnings.some((w) => w.includes('already claims that specifier')),
+check('collision is reported', r6.warnings.some((w) => w.includes('already claims it')),
   p(r6.warnings));
 
 let threw = false;

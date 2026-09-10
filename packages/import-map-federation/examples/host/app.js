@@ -4,7 +4,6 @@ import { getCount, increment, subscribe, VERSION as S_V, instanceId as storeId }
 export const hostMeta = { name: 'host', ui: UI_V, store: S_V, uiId, storeId };
 
 export async function start(fed) {
-  // ---- host's own panel, driven by the shared store ----
   const count = el('strong', { id: 'host-count' }, getCount());
   subscribe((n) => { count.textContent = n; });
   const panel = card('Host application', `@fed/ui@${UI_V} · @fed/store@${S_V}`);
@@ -15,7 +14,6 @@ export async function start(fed) {
   );
   document.getElementById('host-panel').append(panel);
 
-  // ---- mount each MFE into its own container ----
   const mounted = [];
   for (const m of fed.mfes) {
     const box = el('div', { class: 'mfe', id: `mfe-${m.name}` });

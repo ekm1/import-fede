@@ -437,6 +437,28 @@ var ImportMapFederation = (() => {
   }
 
   // src/resolve.js
+  function sharedNames(host, mfes) {
+    const names = new Set(Object.keys(host?.shares ?? {}));
+    for (const m of mfes) for (const n of Object.keys(m.shared ?? {})) names.add(n);
+    return names;
+  }
+  function elect(hostShare, consumers, hostName) {
+    if (hostShare) return { version: hostShare.version, url: hostShare.url, from: hostName };
+    let best = null;
+    for (const { mfe, dep } of consumers) {
+      if (!dep.version || !dep.url) continue;
+      if (!best || satisfy(best.version, `<=${dep.version}`)) {
+        best = { version: dep.version, url: dep.url, from: mfe.name };
+      }
+    }
+    return best;
+  }
+  var accepts = (range, version) => range === "*" || range === false || satisfy(version, range);
+  function remoteSpecifiers(mfe) {
+    const entries = Object.entries(mfe.exposes ?? {}).map(([key, url]) => [`${mfe.name}/${key.replace(/^\.\//, "")}`, url]);
+    if (mfe.entry) entries.push([mfe.name, mfe.entry]);
+    return entries.filter(([, url]) => url);
+  }
   function buildImportMap({
     host = null,
     mfes = [],
@@ -447,94 +469,64 @@ var ImportMapFederation = (() => {
     const scopes = {};
     const decisions = [];
     const warnings = [];
-    const names = /* @__PURE__ */ new Set();
-    for (const n of Object.keys(host?.shares ?? {})) names.add(n);
-    for (const m of mfes) for (const n of Object.keys(m.shared ?? {})) names.add(n);
-    for (const name of names) {
-      const hostShare = host?.shares?.[name];
+    for (const name of sharedNames(host, mfes)) {
       const consumers = mfes.filter((m) => m.shared?.[name]).map((m) => ({ mfe: m, dep: m.shared[name] }));
-      let winner = hostShare ? { version: hostShare.version, url: hostShare.url, from: host.name ?? "host" } : null;
-      if (!winner) {
-        for (const { mfe, dep } of consumers) {
-          if (!dep.version || !dep.url) continue;
-          if (!winner || satisfy(winner.version, `<=${dep.version}`)) {
-            winner = { version: dep.version, url: dep.url, from: mfe.name };
-          }
-        }
-      }
+      const winner = elect(host?.shares?.[name], consumers, host?.name ?? "host");
       if (!winner) continue;
       imports[name] = winner.url;
       for (const { mfe, dep } of consumers) {
         const range = dep.requiredVersion ?? `^${dep.version}`;
-        const compatible = range === "*" || range === false || satisfy(winner.version, range);
-        if (compatible) {
+        let action = "dedupe";
+        if (!accepts(range, winner.version)) {
+          action = "isolate";
+          if (dep.singleton) {
+            const conflict = `Singleton "${name}": ${mfe.name} requires ${range}, shared copy is ${winner.version} from ${winner.from}.`;
+            if (onSingletonConflict === "error") {
+              throw new Error(`${conflict} Refusing to emit two copies.`);
+            }
+            if (onSingletonConflict === "host-wins") {
+              warnings.push(`${conflict} Forcing the shared copy.`);
+              action = "dedupe-forced";
+            } else {
+              warnings.push(`${conflict} Isolating; it must own its whole subtree.`);
+            }
+          }
+          if (action === "isolate" && !dep.url) {
+            warnings.push(`${mfe.name} needs ${name}@${range}, incompatible with ${winner.version}, and ships no copy of its own. It may break.`);
+            action = "dedupe-unsafe";
+          }
+        }
+        if (action === "isolate") {
+          (scopes[mfe.baseUrl] ??= {})[name] = dep.url;
+          decisions.push({ mfe: mfe.name, dep: name, action, resolved: dep.version, requested: range });
+        } else {
           decisions.push({
             mfe: mfe.name,
             dep: name,
-            action: "dedupe",
+            action,
             resolved: winner.version,
-            from: winner.from
+            from: winner.from,
+            ...action === "dedupe" ? {} : { requested: range }
           });
-          continue;
         }
-        const singleton = dep.singleton ?? false;
-        if (singleton) {
-          const msg = `Singleton "${name}": ${mfe.name} requires ${range} but the shared copy is ${winner.version} (from ${winner.from}).`;
-          if (onSingletonConflict === "error") {
-            throw new Error(msg + " Refusing to build a map with two copies of a singleton.");
-          }
-          if (onSingletonConflict === "host-wins") {
-            warnings.push(msg + " Forcing the shared copy (set onSingletonConflict to change).");
-            decisions.push({
-              mfe: mfe.name,
-              dep: name,
-              action: "dedupe-forced",
-              resolved: winner.version,
-              from: winner.from,
-              requested: range
-            });
-            continue;
-          }
-          warnings.push(msg + " Isolating anyway \u2014 it must own its whole subtree.");
-        }
-        if (!dep.url) {
-          warnings.push(`${mfe.name} needs ${name}@${range}, incompatible with ${winner.version}, and ships no own copy. It will get ${winner.version} and may break.`);
-          decisions.push({
-            mfe: mfe.name,
-            dep: name,
-            action: "dedupe-unsafe",
-            resolved: winner.version,
-            requested: range
-          });
-          continue;
-        }
-        (scopes[mfe.baseUrl] ??= {})[name] = dep.url;
-        decisions.push({
-          mfe: mfe.name,
-          dep: name,
-          action: "isolate",
-          resolved: dep.version,
-          requested: range
-        });
       }
     }
     if (exposeRemotes) {
-      for (const m of mfes) {
-        const entries = Object.entries(m.exposes ?? {});
-        if (m.entry) entries.push([".", m.entry]);
-        for (const [key, url] of entries) {
-          if (!url) continue;
-          const spec = key === "." ? m.name : `${m.name}/${key.replace(/^\.\//, "")}`;
+      for (const mfe of mfes) {
+        for (const [spec, url] of remoteSpecifiers(mfe)) {
           if (imports[spec] !== void 0) {
-            warnings.push(`Remote "${m.name}" cannot publish "${spec}": a shared dependency already claims that specifier. Import it by URL instead.`);
+            warnings.push(`Remote "${mfe.name}" cannot publish "${spec}": a shared dependency already claims it. Import it by URL instead.`);
             continue;
           }
           imports[spec] = url;
         }
       }
     }
-    const importMap = Object.keys(scopes).length ? { imports, scopes } : { imports };
-    return { importMap, decisions, warnings };
+    return {
+      importMap: Object.keys(scopes).length ? { imports, scopes } : { imports },
+      decisions,
+      warnings
+    };
   }
 
   // src/bootstrap.js
@@ -542,25 +534,29 @@ var ImportMapFederation = (() => {
     const abs = new URL(manifestUrl, location.href).href;
     const res = await fetch(abs);
     if (!res.ok) throw new Error(`Manifest ${abs} -> HTTP ${res.status}`);
-    const m = await res.json();
+    const manifest = await res.json();
     const baseUrl = new URL(".", abs).href;
     const rel = (u) => u ? new URL(u, baseUrl).href : void 0;
     const shared = {};
-    for (const [name, s] of Object.entries(m.shared ?? {})) shared[name] = { ...s, url: rel(s.url) };
+    for (const [name, s] of Object.entries(manifest.shared ?? {})) {
+      shared[name] = { ...s, url: rel(s.url) };
+    }
     const exposes = {};
-    for (const [k, v] of Object.entries(m.exposes ?? {})) exposes[k] = rel(v);
-    return { name: m.name, baseUrl, entry: rel(m.entry), exposes, shared };
+    for (const [key, url] of Object.entries(manifest.exposes ?? {})) {
+      exposes[key] = rel(url);
+    }
+    return { name: manifest.name, baseUrl, entry: rel(manifest.entry), exposes, shared };
   }
   function injectImportMap(importMap) {
     if (document.querySelector('script[type="importmap"][data-federation]')) {
       throw new Error("An import map has already been injected by this bootstrap.");
     }
-    const s = document.createElement("script");
-    s.type = "importmap";
-    s.dataset.federation = "";
-    s.textContent = JSON.stringify(importMap);
-    document.head.appendChild(s);
-    return s;
+    const script = document.createElement("script");
+    script.type = "importmap";
+    script.dataset.federation = "";
+    script.textContent = JSON.stringify(importMap);
+    document.head.appendChild(script);
+    return script;
   }
   async function bootstrap({ host = null, manifests = [], onSingletonConflict } = {}) {
     const mfes = await Promise.all(manifests.map(fetchManifest));
@@ -569,9 +565,9 @@ var ImportMapFederation = (() => {
     for (const w of warnings) console.warn("[federation]", w);
     const byName = new Map(mfes.map((m) => [m.name, m]));
     async function load(name, expose = "./App") {
-      const m = byName.get(name);
-      if (!m) throw new Error(`Unknown MFE "${name}". Known: ${[...byName.keys()].join(", ")}`);
-      const url = m.exposes[expose] ?? m.entry;
+      const mfe = byName.get(name);
+      if (!mfe) throw new Error(`Unknown MFE "${name}". Known: ${[...byName.keys()].join(", ")}`);
+      const url = mfe.exposes[expose] ?? mfe.entry;
       if (!url) throw new Error(`MFE "${name}" exposes no "${expose}"`);
       return import(url);
     }

@@ -16,8 +16,7 @@
 </style>
 <h1 style="font-size:18px;margin:0 0 4px">Catalog MFE — standalone</h1>
 <p class="lede">No host, no runtime. The same build artifact, its own packages, one static import map.</p>
-<!-- Emitted at build time: a lone MFE has nothing to negotiate.
-     The remote itself is a map entry too, so this page needs no loader at all. -->
+<!-- A lone MFE has nothing to negotiate, so this map is emitted at build time. -->
 <script type="importmap">
 {
   "imports": {
@@ -29,7 +28,7 @@
 </script>
 <div id="root"></div>
 <script type="module">
-  import { mount } from 'catalog/App';   // bare specifier, resolved by the map above
+  import { mount } from 'catalog/App';
   window.__meta = mount(document.getElementById('root'));
   window.__ready = true;
 </script>

@@ -1,8 +1,5 @@
-/**
- * End-to-end: boots the example host with two MFEs in a real browser and asserts
- * that a compatible MFE shares the host's module *instance* while an incompatible
- * one falls back to its own — including that shared state moves together.
- */
+// Boots the host with two MFEs and checks that shared state moves together where
+// deduped and stays separate where isolated.
 import pw from 'playwright';
 import { startServers } from '../examples/serve.mjs';
 

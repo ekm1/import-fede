@@ -1,20 +1,34 @@
 import { satisfy } from './semver.js';
 
-/**
- * Build an import map that dedupes shared deps across a federated host + MFEs,
- * while letting any MFE fall back to its own copy when no compatible version exists.
- *
- * Resolution per shared dep, mirroring MF's "version-first" strategy:
- *   1. Collect candidates: the host's copy (if any) + every MFE's own copy.
- *   2. Elect a winner  -> global `imports`. Host wins by default, else highest version.
- *   3. Per MFE: winner satisfies its requiredVersion -> emit nothing. It falls through
- *      to `imports` and shares the *same module instance*.
- *      Otherwise -> emit a `scopes` entry pinning that MFE's baseUrl to its own copy.
- *
- * Scopes are lazy: a scope for an MFE that never loads costs only bytes. So every
- * known MFE can be scoped up front and the map never has to be mutated at runtime
- * (which is what keeps this working in browsers without multiple-import-map support).
- */
+function sharedNames(host, mfes) {
+  const names = new Set(Object.keys(host?.shares ?? {}));
+  for (const m of mfes) for (const n of Object.keys(m.shared ?? {})) names.add(n);
+  return names;
+}
+
+function elect(hostShare, consumers, hostName) {
+  if (hostShare) return { version: hostShare.version, url: hostShare.url, from: hostName };
+
+  let best = null;
+  for (const { mfe, dep } of consumers) {
+    if (!dep.version || !dep.url) continue;
+    if (!best || satisfy(best.version, `<=${dep.version}`)) {
+      best = { version: dep.version, url: dep.url, from: mfe.name };
+    }
+  }
+  return best;
+}
+
+const accepts = (range, version) =>
+  range === '*' || range === false || satisfy(version, range);
+
+function remoteSpecifiers(mfe) {
+  const entries = Object.entries(mfe.exposes ?? {})
+    .map(([key, url]) => [`${mfe.name}/${key.replace(/^\.\//, '')}`, url]);
+  if (mfe.entry) entries.push([mfe.name, mfe.entry]);
+  return entries.filter(([, url]) => url);
+}
+
 export function buildImportMap({
   host = null, mfes = [], onSingletonConflict = 'host-wins', exposeRemotes = true,
 } = {}) {
@@ -23,87 +37,63 @@ export function buildImportMap({
   const decisions = [];
   const warnings = [];
 
-  const names = new Set();
-  for (const n of Object.keys(host?.shares ?? {})) names.add(n);
-  for (const m of mfes) for (const n of Object.keys(m.shared ?? {})) names.add(n);
-
-  for (const name of names) {
-    const hostShare = host?.shares?.[name];
+  for (const name of sharedNames(host, mfes)) {
     const consumers = mfes
       .filter((m) => m.shared?.[name])
       .map((m) => ({ mfe: m, dep: m.shared[name] }));
 
-    // --- elect the winner that lands in global `imports` ---
-    let winner = hostShare
-      ? { version: hostShare.version, url: hostShare.url, from: host.name ?? 'host' }
-      : null;
-    if (!winner) {
-      for (const { mfe, dep } of consumers) {
-        if (!dep.version || !dep.url) continue;
-        if (!winner || satisfy(winner.version, `<=${dep.version}`)) {
-          winner = { version: dep.version, url: dep.url, from: mfe.name };
-        }
-      }
-    }
+    const winner = elect(host?.shares?.[name], consumers, host?.name ?? 'host');
     if (!winner) continue;
     imports[name] = winner.url;
 
-    // --- per-consumer: dedupe or isolate ---
     for (const { mfe, dep } of consumers) {
       const range = dep.requiredVersion ?? `^${dep.version}`;
-      const compatible = range === '*' || range === false || satisfy(winner.version, range);
+      let action = 'dedupe';
 
-      if (compatible) {
-        decisions.push({ mfe: mfe.name, dep: name, action: 'dedupe',
-          resolved: winner.version, from: winner.from });
-        continue;
-      }
+      if (!accepts(range, winner.version)) {
+        action = 'isolate';
 
-      const singleton = dep.singleton ?? false;
-      if (singleton) {
-        const msg = `Singleton "${name}": ${mfe.name} requires ${range} but the shared copy `
-          + `is ${winner.version} (from ${winner.from}).`;
-        if (onSingletonConflict === 'error') {
-          throw new Error(msg + ' Refusing to build a map with two copies of a singleton.');
+        if (dep.singleton) {
+          const conflict = `Singleton "${name}": ${mfe.name} requires ${range}, `
+            + `shared copy is ${winner.version} from ${winner.from}.`;
+          // Two copies of a singleton break shared context and hooks, so the
+          // default is to force the shared one rather than isolate.
+          if (onSingletonConflict === 'error') {
+            throw new Error(`${conflict} Refusing to emit two copies.`);
+          }
+          if (onSingletonConflict === 'host-wins') {
+            warnings.push(`${conflict} Forcing the shared copy.`);
+            action = 'dedupe-forced';
+          } else {
+            warnings.push(`${conflict} Isolating; it must own its whole subtree.`);
+          }
         }
-        if (onSingletonConflict === 'host-wins') {
-          // Two copies of a singleton break shared context/hooks. Force the shared one.
-          warnings.push(msg + ' Forcing the shared copy (set onSingletonConflict to change).');
-          decisions.push({ mfe: mfe.name, dep: name, action: 'dedupe-forced',
-            resolved: winner.version, from: winner.from, requested: range });
-          continue;
+
+        if (action === 'isolate' && !dep.url) {
+          warnings.push(`${mfe.name} needs ${name}@${range}, incompatible with `
+            + `${winner.version}, and ships no copy of its own. It may break.`);
+          action = 'dedupe-unsafe';
         }
-        warnings.push(msg + ' Isolating anyway — it must own its whole subtree.');
       }
 
-      if (!dep.url) {
-        warnings.push(`${mfe.name} needs ${name}@${range}, incompatible with ${winner.version}, `
-          + `and ships no own copy. It will get ${winner.version} and may break.`);
-        decisions.push({ mfe: mfe.name, dep: name, action: 'dedupe-unsafe',
-          resolved: winner.version, requested: range });
-        continue;
+      if (action === 'isolate') {
+        (scopes[mfe.baseUrl] ??= {})[name] = dep.url;
+        decisions.push({ mfe: mfe.name, dep: name, action, resolved: dep.version, requested: range });
+      } else {
+        decisions.push({
+          mfe: mfe.name, dep: name, action, resolved: winner.version, from: winner.from,
+          ...(action === 'dedupe' ? {} : { requested: range }),
+        });
       }
-
-      (scopes[mfe.baseUrl] ??= {})[name] = dep.url;
-      decisions.push({ mfe: mfe.name, dep: name, action: 'isolate',
-        resolved: dep.version, requested: range });
     }
   }
 
-  // Publish each remote's exposes as bare specifiers ("dashboard/App"), so a page
-  // can `import('dashboard/App')` with nothing but the import map — no loader, no
-  // manifest fetch. Shared deps win a name collision, since breaking a shared dep
-  // breaks every consumer of it.
   if (exposeRemotes) {
-    for (const m of mfes) {
-      const entries = Object.entries(m.exposes ?? {});
-      if (m.entry) entries.push(['.', m.entry]);
-      for (const [key, url] of entries) {
-        if (!url) continue;
-        const spec = key === '.' ? m.name : `${m.name}/${key.replace(/^\.\//, '')}`;
+    for (const mfe of mfes) {
+      for (const [spec, url] of remoteSpecifiers(mfe)) {
         if (imports[spec] !== undefined) {
-          warnings.push(`Remote "${m.name}" cannot publish "${spec}": a shared dependency `
-            + `already claims that specifier. Import it by URL instead.`);
+          warnings.push(`Remote "${mfe.name}" cannot publish "${spec}": `
+            + `a shared dependency already claims it. Import it by URL instead.`);
           continue;
         }
         imports[spec] = url;
@@ -111,6 +101,9 @@ export function buildImportMap({
     }
   }
 
-  const importMap = Object.keys(scopes).length ? { imports, scopes } : { imports };
-  return { importMap, decisions, warnings };
+  return {
+    importMap: Object.keys(scopes).length ? { imports, scopes } : { imports },
+    decisions,
+    warnings,
+  };
 }

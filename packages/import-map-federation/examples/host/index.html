@@ -44,8 +44,7 @@
 <script src="/dist/import-map-federation.global.js"></script>
 <script>
   (async () => {
-    // Overridable so tests can run on their own ports instead of silently
-    // depending on whatever happens to be serving :8100.
+    // Overridable so tests bind their own ports instead of a fixed one.
     const CDN = new URLSearchParams(location.search).get('cdn') || 'http://127.0.0.1:8100';
     try {
       const fed = await window.ImportMapFederation.bootstrap({

@@ -5,8 +5,7 @@ import { legend } from './chunks/legend.js';
 export const meta = { name: 'legacy', ui: UI_V, store: S_V, uiId, storeId };
 
 export function mount(root) {
-  // add() only exists in @fed/store v1 — if this MFE were handed the host's v2
-  // it would throw. That is why it must fall back to its own copy.
+  // add() exists only in v1; the host's v2 would throw here.
   const total = el('strong', { id: 'legacy-total' }, getTotal());
   subscribe((n) => { total.textContent = n; });
   const panel = card('Legacy MFE', `@fed/ui@${UI_V} · @fed/store@${S_V}`);

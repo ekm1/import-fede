@@ -6,16 +6,13 @@ import { __vendor as vReact } from 'react';
 
 export const vendors = { react: vReact, 'react-redux': vReactRedux, 'date-fns': vDateFns };
 
-/**
- * Rendered INSIDE the host's React tree. useSelector/useDispatch reach the host's
- * store through context, and useLocation reaches the host's router — both of which
- * only work if React and react-redux are the very same instances the host loaded.
- */
+// Rendered inside the host's React tree: the hooks below reach the host's store
+// and router through context, which only works if React is genuinely shared.
 export function App() {
   const items = useSelector((s) => s.cart.items);
   const dispatch = useDispatch();
   const location = useLocation();
-  const [n, setN] = useState(0);           // a hook: throws if React is duplicated
+  const [n, setN] = useState(0);
 
   return (
     <div className="mfe-body">
@@ -32,7 +29,7 @@ export function App() {
   );
 }
 
-/** Standalone: no host, so it brings its own store and router. */
+// No host, so it brings its own store and router.
 export async function mountStandalone(el) {
   const { createRoot } = await import('react-dom/client');
   const { configureStore, createSlice } = await import('@reduxjs/toolkit');

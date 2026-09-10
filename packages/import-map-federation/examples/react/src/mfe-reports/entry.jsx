@@ -5,11 +5,8 @@ import { __vendor as vReact } from 'react';
 
 export const vendors = { react: vReact, 'react-redux': vReactRedux, 'date-fns': vDateFns };
 
-/**
- * Pins date-fns@^2 while the host is on v4, so it gets its OWN date-fns — but it
- * still shares React and react-redux with the host, and still reads the host's store.
- * Isolation is per dependency, not per MFE.
- */
+// Pins date-fns@^2 against the host's v4, so it gets its own copy of that one
+// library while still sharing React and reading the host's store.
 export function App() {
   const items = useSelector((s) => s.cart.items);
   const since = new Date(Date.now() - 1000 * 60 * 90);

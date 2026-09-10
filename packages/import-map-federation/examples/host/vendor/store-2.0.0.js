@@ -1,4 +1,4 @@
-// @fed/store@2.0.0 — v2 API: increment()
+// @fed/store@2.0.0, v2 API: increment()
 const state = { count: 0 };
 const subs = new Set();
 export const VERSION = '2.0.0';

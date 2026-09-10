@@ -1,14 +1,7 @@
-/**
- * End-to-end against real libraries: React 18, Redux Toolkit, react-redux,
- * react-router-dom and date-fns.
- *
- * The MFEs render as React components inside the HOST's tree, so their hooks,
- * useSelector and useLocation only work if React, react-redux and react-router
- * are literally the same instances the host loaded. A duplicated React would
- * throw "Invalid hook call"; a duplicated react-redux would throw "could not
- * find react-redux context". Those failures are the real assertion — the
- * instance-id checks below just localise them.
- */
+// The MFEs render inside the host's React tree, so a duplicated React or
+// react-redux breaks them outright. Instance ids are asserted directly because a
+// duplicate does not reliably throw: it only surfaces when the MFE calls a hook
+// from its own copy.
 import pw from 'playwright';
 import { startServers } from '../examples/serve.mjs';
 

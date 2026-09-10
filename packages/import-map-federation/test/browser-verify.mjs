@@ -1,11 +1,5 @@
-/**
- * Verifies the map the resolver generates actually produces the intended behaviour
- * in a real browser, across two origins: a compatible remote shares the host's
- * module instance, an incompatible one falls back to its own.
- *
- * Starts its own servers so it never passes by accident against whatever happens
- * to be listening.
- */
+// Runs the generated map in a real browser across two origins. Starts its own
+// servers so it can't pass against whatever happens to be listening.
 import pw from 'playwright';
 import { buildImportMap } from '../src/resolve.js';
 import { startServers } from '../examples/serve.mjs';

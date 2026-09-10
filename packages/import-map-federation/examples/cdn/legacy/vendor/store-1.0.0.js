@@ -1,5 +1,4 @@
-// @fed/store@1.0.0 — v1 API: add(). Deliberately has no increment(),
-// so handing this MFE the host's v2 would throw. Isolation is required.
+// @fed/store@1.0.0, v1 API: add(). No increment(), so the host's v2 would throw here.
 const state = { total: 0 };
 const subs = new Set();
 export const VERSION = '1.0.0';

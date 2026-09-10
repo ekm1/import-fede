@@ -1,10 +1,5 @@
-/**
- * Builds the realistic example: React 18, Redux Toolkit, react-redux, react-router
- * and date-fns, as vendor chunks + app bundles wired through an import map.
- *
- * Each app ships its OWN complete vendor set so it can run standalone; the import
- * map is what decides, at load time, whether it actually uses them.
- */
+// Every app ships a complete vendor set so it can run standalone; the import map
+// decides at load time whether it actually uses them.
 import { buildVendorChunk, buildApp } from '../../scripts/build-vendor.mjs';
 import { writeFile, rm, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -17,7 +12,6 @@ const DIST = join(HERE, 'dist');
 const SHARED = ['react', 'react-dom', 'react-dom/client', '@reduxjs/toolkit',
                 'react-redux', 'react-router-dom', 'date-fns'];
 
-// pkg, specifier it is published as, version, externals it must NOT bundle
 const base = (dateFnsPkg, dateFnsVersion) => [
   { pkg: 'react',            name: 'react',            version: '18.3.1',      external: [] },
   { pkg: 'react-dom',        name: 'react-dom',        version: '18.3.1',      external: ['react'] },
@@ -36,10 +30,8 @@ async function buildVendors(specs, outDir) {
     await buildVendorChunk({ ...s, outfile: join(outDir, 'vendor', file), cwd: CWD });
     urls[s.name] = { version: s.version, url: `./vendor/${file}` };
   }
-  // react-dom already exports createRoot/hydrateRoot, so "react-dom/client" points at
-  // the same chunk. Building it separately would either duplicate the renderer or, with
-  // react-dom external, make the chunk import itself — esbuild's `external` matches
-  // subpaths, so externalising "react-dom" also externalises "react-dom/client".
+  // react-dom already exports createRoot, and esbuild's `external` matches subpaths,
+  // so a separate chunk here would either duplicate the renderer or import itself.
   urls['react-dom/client'] = { ...urls['react-dom'] };
   return urls;
 }
@@ -54,7 +46,6 @@ const RANGES = { react: '^18.0.0', 'react-dom': '^18.0.0', 'react-dom/client': '
 
 await rm(DIST, { recursive: true, force: true });
 
-// ---------------- host ----------------
 console.log('building host vendors...');
 const hostVendors = await buildVendors(base('date-fns', '4.4.0'), join(DIST, 'host'));
 await buildApp({ entry: join(HERE, 'src/host/app.jsx'), outfile: join(DIST, 'host/app.js'),
@@ -64,7 +55,6 @@ const hostShares = Object.fromEntries(Object.entries(hostVendors)
   .map(([n, v]) => [n, { version: v.version, url: v.url.replace('./', '/') }]));
 await writeFile(join(DIST, 'host/index.html'), hostHtml());
 
-// ---------------- MFEs ----------------
 for (const mfe of MFES) {
   console.log(`building ${mfe.name} vendors...`);
   const out = join(DIST, 'cdn', mfe.name);
@@ -90,7 +80,6 @@ for (const mfe of MFES) {
 
 console.log('\ndist/ built. Run: npm run example:react');
 
-// ---------------- templates ----------------
 function styles() {
   return `
   :root { color-scheme: light dark; --bd:#d5d8dd; --mut:#666; --ok:#0a7c42; --iso:#b25000; }
