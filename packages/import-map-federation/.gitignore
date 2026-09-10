@@ -1,1 +1,5 @@
 node_modules/
+examples/react/dist/
+examples/react/build/node_modules/
+examples/react/build/package-lock.json
+examples/react/build/.vendor-entries/

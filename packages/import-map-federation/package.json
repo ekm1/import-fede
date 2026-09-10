@@ -2,12 +2,22 @@
   "name": "import-map-federation",
   "version": "0.1.0",
   "type": "module",
-  "exports": { ".": "./src/bootstrap.js", "./resolve": "./src/resolve.js" },
+  "exports": {
+    ".": "./src/bootstrap.js",
+    "./resolve": "./src/resolve.js"
+  },
   "scripts": {
     "build": "esbuild src/bootstrap.js --bundle --format=iife --global-name=ImportMapFederation --outfile=dist/import-map-federation.global.js",
     "test": "node test/resolve.test.mjs",
     "test:browser": "node test/browser-verify.mjs",
-    "example": "node examples/serve.mjs"
+    "example": "node examples/serve.mjs basic",
+    "example:react": "node examples/serve.mjs react",
+    "build:react": "node examples/react/build.mjs",
+    "test:e2e": "node test/e2e.test.mjs",
+    "test:e2e:react": "node test/e2e-react.test.mjs"
   },
-  "devDependencies": { "esbuild": "^0.28.0", "playwright": "^1.56.0" }
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "playwright": "^1.56.0"
+  }
 }

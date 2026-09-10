@@ -21,7 +21,7 @@ try {
   const page = await browser.newPage();
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
   page.on('pageerror', (e) => errors.push('pageerror: ' + String(e).slice(0, 200)));
-  await page.goto(servers.hostUrl + '/');
+  await page.goto(`${servers.hostUrl}/?cdn=${encodeURIComponent(servers.cdnUrl)}`);
   await page.waitForFunction('window.__ready === true', null, { timeout: 15000 });
 
   const bootError = await page.evaluate(() => window.__bootError);

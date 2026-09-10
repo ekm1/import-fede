@@ -135,12 +135,65 @@ Each MFE also runs standalone from the same build artifact, against a static
 import map emitted at build time — a lone MFE has nothing to negotiate, so that
 path needs no runtime at all.
 
+## Realistic example: React, Redux, React Router
+
+```
+npm install --prefix examples/react/build   # real packages
+npm run build:react                          # vendor chunks + app bundles
+npm run example:react
+```
+
+React 18, Redux Toolkit, react-redux, react-router-dom and date-fns, built with
+esbuild into vendor chunks and app bundles wired through a generated import map.
+
+Both MFEs render as React **components inside the host's tree**, so their hooks,
+`useSelector` and `useLocation` only work if React, react-redux and react-router
+are literally the host's instances. `reports` pins `date-fns@^2` against the
+host's v4 and so gets its own copy of that one library — while still sharing
+everything else and still reading the host's Redux store.
+
+Clicking "Add from Host" or "Add to host cart" moves one store: the host and both
+MFEs update together.
+
+### What building against real packages surfaced
+
+- **`export *` from a CommonJS package emits no named exports.** React is CJS, so
+  the builder enumerates export names up front and re-exports them explicitly.
+- **Node and esbuild disagree about default exports.** They resolve packages
+  through different export conditions, so a package can have a default via
+  `require` and none via `import` (react-router-dom). esbuild does the bundling,
+  so it decides: the builder retries without the default when esbuild objects.
+- **esbuild cannot rewrite `require()` of an external package** into an ESM
+  import; it emits a shim that throws at runtime. That shim delegates to a
+  `require` in scope, so vendor chunks get a banner binding one to the real ESM
+  namespaces of their externals.
+- **esbuild's `external` matches subpaths.** Externalising `react-dom` also
+  externalises `react-dom/client`, which made that chunk import itself. Since
+  `react-dom` already exports `createRoot`, the specifier now points at the same
+  chunk — which also guarantees a single renderer instance.
+- **Peer deps must stay external.** A react-redux chunk that bundled its own
+  React would break every hook. The built chunk imports bare `"react"` and
+  resolves through the map like everything else.
+
+### On the negative test
+
+Forcing React to isolate for `reports` produced **no error** — it only calls hooks
+through react-redux, which was still shared, and React elements are
+interchangeable across copies because `$$typeof` is a global symbol. Forcing the
+same on `dashboard`, which calls `useState` from its own import, fails as
+expected with `Cannot read properties of null (reading 'useState')`.
+
+So a duplicated singleton does not reliably announce itself. That is why the e2e
+asserts **instance identity** directly rather than relying on a crash, and why
+`singleton: true` deps are forced onto one copy instead of being isolated.
+
 ## Tests
 
 ```
-npm test              # resolver logic
-npm run test:browser  # generated map, real browser, two origins
-node test/e2e.test.mjs   # full example: mount, share, isolate, standalone
+npm test                 # resolver logic
+npm run test:browser     # generated map, real browser, two origins
+npm run test:e2e         # basic example: mount, share, isolate, standalone
+npm run test:e2e:react   # React/Redux/Router example (needs build:react first)
 ```
 
 The e2e test asserts module *instance* identity, not just version strings: it

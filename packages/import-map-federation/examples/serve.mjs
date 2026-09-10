@@ -29,9 +29,17 @@ function serve(roots, { cors = false } = {}) {
   });
 }
 
-export async function startServers({ hostPort = 8099, cdnPort = 8100 } = {}) {
-  const host = serve([['/dist/', join(PKG, 'dist')], ['/', join(HERE, 'host')]]);
-  const cdn = serve([['/', join(HERE, 'cdn')]], { cors: true });
+const EXAMPLES = {
+  basic: { host: join(HERE, 'host'), cdn: join(HERE, 'cdn') },
+  react: { host: join(HERE, 'react/dist/host'), cdn: join(HERE, 'react/dist/cdn') },
+};
+
+export async function startServers({ hostPort = 8099, cdnPort = 8100, example = 'basic' } = {}) {
+  const dirs = EXAMPLES[example];
+  if (!dirs) throw new Error(`Unknown example "${example}". Try: ${Object.keys(EXAMPLES).join(', ')}`);
+  // /dist/ serves the bootstrap IIFE from the package, for both examples.
+  const host = serve([['/dist/', join(PKG, 'dist')], ['/', dirs.host]]);
+  const cdn = serve([['/', dirs.cdn]], { cors: true });
   await new Promise((r) => host.listen(hostPort, '127.0.0.1', r));
   await new Promise((r) => cdn.listen(cdnPort, '127.0.0.1', r));
   return {
@@ -42,9 +50,11 @@ export async function startServers({ hostPort = 8099, cdnPort = 8100 } = {}) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const { hostUrl, cdnUrl } = await startServers();
+  const example = process.argv[2] ?? 'basic';
+  const { hostUrl, cdnUrl } = await startServers({ example });
+  const mfes = example === 'react' ? ['dashboard', 'reports'] : ['catalog', 'legacy'];
+  console.log(`example    ${example}`);
   console.log(`host       ${hostUrl}/`);
-  console.log(`catalog    ${cdnUrl}/catalog/standalone.html`);
-  console.log(`legacy     ${cdnUrl}/legacy/standalone.html`);
+  for (const m of mfes) console.log(`${m.padEnd(10)} ${cdnUrl}/${m}/standalone.html`);
   console.log('\nCtrl-C to stop.');
 }

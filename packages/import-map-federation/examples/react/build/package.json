@@ -1,0 +1,15 @@
+{
+  "name": "federation-react-example-build",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@reduxjs/toolkit": "^2.2.0",
+    "react-redux": "^9.1.0",
+    "react-router-dom": "^6.23.0",
+    "date-fns": "^4.1.0",
+    "date-fns-v2": "npm:date-fns@^2.30.0"
+  },
+  "devDependencies": { "esbuild": "^0.28.0" }
+}
