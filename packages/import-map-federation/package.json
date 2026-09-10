@@ -14,7 +14,12 @@
     "example:react": "node examples/serve.mjs react",
     "build:react": "node examples/react/build.mjs",
     "test:e2e": "node test/e2e.test.mjs",
-    "test:e2e:react": "node test/e2e-react.test.mjs"
+    "test:e2e:react": "node test/e2e-react.test.mjs",
+    "pretest:e2e": "npm run build",
+    "pretest:e2e:react": "npm run build",
+    "preexample": "npm run build",
+    "preexample:react": "npm run build",
+    "test:all": "npm test && npm run test:browser && npm run test:e2e && npm run test:e2e:react"
   },
   "devDependencies": {
     "esbuild": "^0.28.0",

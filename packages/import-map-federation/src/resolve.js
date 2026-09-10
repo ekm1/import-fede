@@ -15,7 +15,9 @@ import { satisfy } from './semver.js';
  * known MFE can be scoped up front and the map never has to be mutated at runtime
  * (which is what keeps this working in browsers without multiple-import-map support).
  */
-export function buildImportMap({ host = null, mfes = [], onSingletonConflict = 'host-wins' } = {}) {
+export function buildImportMap({
+  host = null, mfes = [], onSingletonConflict = 'host-wins', exposeRemotes = true,
+} = {}) {
   const imports = {};
   const scopes = {};
   const decisions = [];
@@ -85,6 +87,27 @@ export function buildImportMap({ host = null, mfes = [], onSingletonConflict = '
       (scopes[mfe.baseUrl] ??= {})[name] = dep.url;
       decisions.push({ mfe: mfe.name, dep: name, action: 'isolate',
         resolved: dep.version, requested: range });
+    }
+  }
+
+  // Publish each remote's exposes as bare specifiers ("dashboard/App"), so a page
+  // can `import('dashboard/App')` with nothing but the import map — no loader, no
+  // manifest fetch. Shared deps win a name collision, since breaking a shared dep
+  // breaks every consumer of it.
+  if (exposeRemotes) {
+    for (const m of mfes) {
+      const entries = Object.entries(m.exposes ?? {});
+      if (m.entry) entries.push(['.', m.entry]);
+      for (const [key, url] of entries) {
+        if (!url) continue;
+        const spec = key === '.' ? m.name : `${m.name}/${key.replace(/^\.\//, '')}`;
+        if (imports[spec] !== undefined) {
+          warnings.push(`Remote "${m.name}" cannot publish "${spec}": a shared dependency `
+            + `already claims that specifier. Import it by URL instead.`);
+          continue;
+        }
+        imports[spec] = url;
+      }
     }
   }
 

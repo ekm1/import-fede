@@ -32,6 +32,7 @@ function serve(roots, { cors = false } = {}) {
 const EXAMPLES = {
   basic: { host: join(HERE, 'host'), cdn: join(HERE, 'cdn') },
   react: { host: join(HERE, 'react/dist/host'), cdn: join(HERE, 'react/dist/cdn') },
+  fixtures: { host: join(PKG, 'test/fixtures/host'), cdn: join(PKG, 'test/fixtures/cdn') },
 };
 
 export async function startServers({ hostPort = 8099, cdnPort = 8100, example = 'basic' } = {}) {

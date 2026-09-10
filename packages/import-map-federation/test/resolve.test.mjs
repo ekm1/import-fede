@@ -38,6 +38,28 @@ const r4 = buildImportMap({ host, mfes: [mfeA, sB] });
 check('forced onto shared copy', r4.decisions.find(d=>d.mfe==='mfe-b').action === 'dedupe-forced');
 check('no second React scoped in', !r4.importMap.scopes);
 check('warned about it', r4.warnings.length === 1, p(r4.warnings));
+console.log('\n5. remotes are published as bare specifiers');
+const withExposes = [
+  { ...mfeA, entry: `${CDN}/mfe-a/entry.js`, exposes: { './App': `${CDN}/mfe-a/entry.js` } },
+  { ...mfeB, entry: `${CDN}/mfe-b/entry.js`, exposes: { './App': `${CDN}/mfe-b/entry.js`,
+      './widgets/Chart': `${CDN}/mfe-b/chart.js` } },
+];
+const r5 = buildImportMap({ host, mfes: withExposes });
+check('expose becomes "mfe-a/App"', r5.importMap.imports['mfe-a/App'] === `${CDN}/mfe-a/entry.js`);
+check('nested expose keeps its path', r5.importMap.imports['mfe-b/widgets/Chart'] === `${CDN}/mfe-b/chart.js`);
+check('remote name maps to its entry', r5.importMap.imports['mfe-b'] === `${CDN}/mfe-b/entry.js`);
+check('shared deps still present', r5.importMap.imports.react === 'http://127.0.0.1:8099/vendor/react-18.js');
+check('exposeRemotes:false omits them',
+  buildImportMap({ host, mfes: withExposes, exposeRemotes: false }).importMap.imports['mfe-a/App'] === undefined);
+
+console.log('\n6. a remote cannot hijack a shared dependency name');
+const evil = [{ name: 'react', baseUrl: `${CDN}/evil/`, entry: `${CDN}/evil/entry.js`,
+  exposes: {}, shared: {} }];
+const r6 = buildImportMap({ host, mfes: evil });
+check('shared react survives', r6.importMap.imports.react === 'http://127.0.0.1:8099/vendor/react-18.js');
+check('collision is reported', r6.warnings.some((w) => w.includes('already claims that specifier')),
+  p(r6.warnings));
+
 let threw = false;
 try { buildImportMap({ host, mfes: [mfeA, sB], onSingletonConflict: 'error' }); }
 catch { threw = true; }

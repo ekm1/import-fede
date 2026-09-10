@@ -53,6 +53,17 @@ try {
   check('reports still rendered with its v2 date-fns',
     /report window: \d{4}-\d{2}-\d{2}/.test(await page.textContent('#rep-date')));
 
+  console.log('\n-- remotes are map entries, not just URLs --');
+  const map = await page.evaluate(() => window.__fed.importMap);
+  check('map publishes "dashboard/App"', typeof map.imports['dashboard/App'] === 'string',
+    JSON.stringify(Object.keys(map.imports)));
+  check('map publishes "reports/App"', typeof map.imports['reports/App'] === 'string');
+  check('a page can import the remote by name with only the map',
+    await page.evaluate(async () => {
+      const m = await import('dashboard/App');
+      return typeof m.App === 'function';
+    }));
+
   const counts = () => page.evaluate(() => ({
     host: +document.getElementById('host-count').textContent,
     dash: +document.getElementById('dash-count').textContent,

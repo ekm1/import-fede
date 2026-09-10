@@ -84,6 +84,7 @@ for (const mfe of MFES) {
     { name: mfe.name, entry: './entry.js', exposes: { './App': './entry.js' }, shared }, null, 2));
 
   const imports = Object.fromEntries(Object.entries(vendors).map(([n, v]) => [n, v.url]));
+  imports[`${mfe.name}/App`] = './entry.js';   // the remote is a map entry too
   await writeFile(join(out, 'standalone.html'), standaloneHtml(mfe.name, imports));
 }
 
@@ -158,13 +159,14 @@ function standaloneHtml(name, imports) {
 <title>${name} MFE — standalone</title>
 <style>${styles()}</style>
 <h1>${name} MFE — standalone</h1>
-<p class="lede">No host, no runtime. The same build artifact, its own packages, one static import map.</p>
+<p class="lede">No host, no loader, no manifest fetch. One static import map, and the remote
+  imported by name: <code>import('${name}/App')</code>.</p>
 <script type="importmap">
 ${JSON.stringify({ imports }, null, 2)}
 </script>
 <div id="root"></div>
 <script type="module">
-  import { mountStandalone } from './entry.js';
+  import { mountStandalone } from '${name}/App';
   mountStandalone(document.getElementById('root'))
     .then((v) => { window.__vendors = v; window.__ready = true; })
     .catch((e) => { window.__bootError = String(e); window.__ready = true;

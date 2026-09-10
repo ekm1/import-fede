@@ -59,6 +59,12 @@ const { importMap, decisions, warnings } = buildImportMap({
 highest version winning (MF's `version-first` strategy). A single MFE and no host
 yields a standalone map.
 
+Each remote's exposes are also published as bare specifiers — `dashboard/App`,
+plus the remote's own name for its entry — so a page can `import('dashboard/App')`
+with nothing but the import map, no loader and no manifest fetch. A shared
+dependency wins any name collision, and the clash is reported in `warnings`. Pass
+`exposeRemotes: false` to emit shared deps only.
+
 `decisions` is a per-MFE audit log (`dedupe` / `isolate` / `dedupe-forced` /
 `dedupe-unsafe`) — assert on it in CI to catch a dep silently splitting in two.
 
@@ -190,11 +196,15 @@ asserts **instance identity** directly rather than relying on a crash, and why
 ## Tests
 
 ```
+npm run test:all         # everything below
 npm test                 # resolver logic
 npm run test:browser     # generated map, real browser, two origins
 npm run test:e2e         # basic example: mount, share, isolate, standalone
 npm run test:e2e:react   # React/Redux/Router example (needs build:react first)
 ```
+
+Every suite starts its own servers on its own ports, so none of them can pass
+against a server left running from something else.
 
 The e2e test asserts module *instance* identity, not just version strings: it
 clicks through the host and both MFEs and checks that shared state moves together

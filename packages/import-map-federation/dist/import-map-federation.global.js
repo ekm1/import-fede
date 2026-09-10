@@ -17,7 +17,7 @@ var ImportMapFederation = (() => {
   };
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // packages/import-map-federation/src/bootstrap.js
+  // src/bootstrap.js
   var bootstrap_exports = {};
   __export(bootstrap_exports, {
     bootstrap: () => bootstrap,
@@ -25,7 +25,7 @@ var ImportMapFederation = (() => {
     injectImportMap: () => injectImportMap
   });
 
-  // packages/import-map-federation/src/semver.js
+  // src/semver.js
   var buildIdentifier = "[0-9A-Za-z-]+";
   var build = `(?:\\+(${buildIdentifier}(?:\\.${buildIdentifier})*))`;
   var numericIdentifier = "0|[1-9]\\d*";
@@ -436,8 +436,13 @@ var ImportMapFederation = (() => {
     return false;
   }
 
-  // packages/import-map-federation/src/resolve.js
-  function buildImportMap({ host = null, mfes = [], onSingletonConflict = "host-wins" } = {}) {
+  // src/resolve.js
+  function buildImportMap({
+    host = null,
+    mfes = [],
+    onSingletonConflict = "host-wins",
+    exposeRemotes = true
+  } = {}) {
     const imports = {};
     const scopes = {};
     const decisions = [];
@@ -513,11 +518,26 @@ var ImportMapFederation = (() => {
         });
       }
     }
+    if (exposeRemotes) {
+      for (const m of mfes) {
+        const entries = Object.entries(m.exposes ?? {});
+        if (m.entry) entries.push([".", m.entry]);
+        for (const [key, url] of entries) {
+          if (!url) continue;
+          const spec = key === "." ? m.name : `${m.name}/${key.replace(/^\.\//, "")}`;
+          if (imports[spec] !== void 0) {
+            warnings.push(`Remote "${m.name}" cannot publish "${spec}": a shared dependency already claims that specifier. Import it by URL instead.`);
+            continue;
+          }
+          imports[spec] = url;
+        }
+      }
+    }
     const importMap = Object.keys(scopes).length ? { imports, scopes } : { imports };
     return { importMap, decisions, warnings };
   }
 
-  // packages/import-map-federation/src/bootstrap.js
+  // src/bootstrap.js
   async function fetchManifest(manifestUrl) {
     const abs = new URL(manifestUrl, location.href).href;
     const res = await fetch(abs);
